@@ -1,0 +1,33 @@
+[Unit]
+Description=PHP2Shell Honeypot evidence collector
+After=network.target
+
+[Service]
+Type=simple
+User=php2shell
+Group=php2shell
+WorkingDirectory=/opt/php2shell-honeypot
+ExecStart=/usr/bin/python3 /opt/php2shell-honeypot/honeypot.py serve --host 0.0.0.0 --port 8080 --data /var/lib/php2shell-honeypot --max-connections 4 --quota-mib 4096
+Restart=on-failure
+RestartSec=10
+StateDirectory=php2shell-honeypot
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6
+CapabilityBoundingSet=
+MemoryMax=512M
+TasksMax=64
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

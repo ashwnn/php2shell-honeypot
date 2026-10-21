@@ -1,0 +1,6 @@
+.git
+.github
+data
+__pycache__
+**/__pycache__
+*.pem
