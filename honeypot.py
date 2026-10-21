@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PHP2Shell Honeypot 0.1.0: inert HTTP/1.x evidence collector. No PHP runtime."""
+"""PHP2Shell Honeypot 0.2.0: inert HTTP/1.x evidence collector. No PHP runtime."""
 import argparse
 import asyncio
 from collections import Counter
@@ -14,7 +14,7 @@ import ssl
 import time
 import uuid
 
-VERSION = '0.1.0'
+VERSION = '0.2.0'
 HEADER_LIMIT = 65536
 RESPONSE = (b'HTTP/1.1 200 OK\r\nServer: Apache\r\nX-Powered-By: PHP/8.5.11\r\n'
             b'Content-Type: text/html; charset=UTF-8\r\nContent-Length: 100\r\nConnection: close\r\n\r\n')

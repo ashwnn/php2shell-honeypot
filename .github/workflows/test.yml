@@ -1,11 +1,11 @@
-name: Test collector
+name: Test collector and Compose
 on:
   push:
   pull_request:
 permissions:
   contents: read
 jobs:
-  test:
+  unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -13,3 +13,17 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m unittest discover -s tests -v
+  compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y sshpass
+      - run: docker compose config --quiet
+      - run: docker compose --profile test up -d --build
+      - run: python3 scripts/smoke-compose.py
+      - name: Retain diagnostics on failure
+        if: failure()
+        run: docker compose ps -a && docker compose logs --no-color --tail 100
+      - if: always()
+        run: docker compose --profile test down
