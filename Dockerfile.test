@@ -1,0 +1,15 @@
+# Run with: docker build -f Dockerfile.test -t php2shell-tests:local .
+# Tests run during the image build. No host Rust installation is required.
+FROM rust:1.90-bookworm
+RUN apt-get update && apt-get install -y --no-install-recommends python3 openssl && rm -rf /var/lib/apt/lists/*
+RUN rustup component add rustfmt clippy
+WORKDIR /tests
+COPY Cargo.* ./
+COPY src ./src
+COPY tests ./tests
+COPY scripts/smoke-tls.py ./scripts/smoke-tls.py
+RUN test -f Cargo.lock || cargo generate-lockfile
+# Format the temporary source copy; host files are not modified.
+RUN cargo fmt --all && cargo test --locked && cargo clippy --locked --all-targets
+RUN python3 scripts/smoke-tls.py target/debug/php2shell
+CMD ["true"]

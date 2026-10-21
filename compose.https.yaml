@@ -1,0 +1,40 @@
+# Optional TLS listener. Combine AFTER compose.public.yaml on the public VPS.
+# Supply a fullchain.pem and privkey.pem readable by uid 65532 in TLS_DIRECTORY.
+services:
+  guard:
+    ports:
+      - "${PUBLIC_BIND_ADDRESS:-127.0.0.1}:${PUBLIC_HTTPS_PORT:-443}:8443"
+      - "${PUBLIC_BIND_ADDRESS:-127.0.0.1}:${PUBLIC_HTTPS_ALT_PORT:-8443}:8443"
+  https:
+    image: php2shell-sensor:local
+    build: .
+    network_mode: service:guard
+    depends_on:
+      guard:
+        condition: service_healthy
+    command: ["--host", "0.0.0.0", "--port", "8443", "--data", "/data", "--quota-mib", "${HTTP_QUOTA_MIB:-4096}", "--cert", "/tls/fullchain.pem", "--key", "/tls/privkey.pem"]
+    volumes:
+      - https-data:/data
+      - ${TLS_DIRECTORY:-./tls}:/tls:ro
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 1
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: [CMD, php2shell, health, --data, /data]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+  tools:
+    volumes:
+      - https-data:/https:ro
+volumes:
+  https-data:

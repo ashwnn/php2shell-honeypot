@@ -22,6 +22,7 @@ services:
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${HTTP_PORT:-8080}:8080"
       - "${BIND_ADDRESS:-127.0.0.1}:${SSH_PORT:-2222}:2222"
+      - "${BIND_ADDRESS:-127.0.0.1}:${TELNET_PORT:-2323}:2223"
     sysctls:
       net.ipv6.conf.all.disable_ipv6: "1"
     healthcheck:
@@ -47,7 +48,7 @@ services:
     cpus: 1
     healthcheck:
       # Check the database, not a loopback TCP probe: new outbound sockets are blocked.
-      test: [CMD, python, -c, "import sqlite3; c=sqlite3.connect('file:/data/events.sqlite3?mode=ro',uri=True); c.execute('SELECT 1 FROM events LIMIT 1'); c.close()"]
+      test: [CMD, php2shell, health, --data, /data]
       interval: 30s
       timeout: 3s
       retries: 3
@@ -72,7 +73,7 @@ services:
     image: php2shell-sensor:local
     build: .
     profiles: [tools]
-    entrypoint: [python, /app/trace.py]
+    entrypoint: [php2shell, trace]
     command: [--help]
     network_mode: none
     read_only: true
@@ -85,10 +86,16 @@ services:
     cpus: 1
 
   probe:
-    image: php2shell-sensor:local
-    build: .
+    image: python:3.12-slim
     profiles: [test]
     entrypoint: [python, -m, http.server, "9090"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  ssh-client:
+    build: ./docker/test-client
+    profiles: [test]
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]

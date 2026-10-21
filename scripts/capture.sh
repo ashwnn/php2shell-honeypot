@@ -10,4 +10,4 @@ chmod 700 "$2"
 # 32 x 100 MB ring; includes TCP handshakes, rejected connections, TLS bytes.
 # tcpdump drops privileges to tcpdump on many distros: make the directory
 # writable by that account first, or use the local distro capture service.
-exec tcpdump -i "$1" -n -s 0 -U -C 100 -W 32 -w "$2/traffic.pcap" 'tcp port 8080 or tcp port 8443 or tcp port 2222'
+exec tcpdump -i "$1" -n -s 0 -U -C 100 -W 32 -w "$2/traffic.pcap" 'tcp port 80 or tcp port 443 or tcp port 8080 or tcp port 8443 or tcp port 22 or tcp port 2222 or tcp port 23 or tcp port 2323'

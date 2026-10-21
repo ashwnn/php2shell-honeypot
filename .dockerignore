@@ -4,3 +4,9 @@ data
 __pycache__
 **/__pycache__
 *.pem
+
+target
+.env
+.env.vps
+exports
+tls

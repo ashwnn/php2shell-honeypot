@@ -1,0 +1,10 @@
+# Explicit public exposure for a dedicated VPS. Compose v2.24.4+ is required
+# for !override. This replaces, rather than appends, the local-only port list.
+services:
+  guard:
+    ports: !override
+      - "${PUBLIC_BIND_ADDRESS:-0.0.0.0}:${PUBLIC_HTTP_PORT:-80}:8080"
+      - "${PUBLIC_BIND_ADDRESS:-0.0.0.0}:${PUBLIC_HTTP_ALT_PORT:-8080}:8080"
+      - "${PUBLIC_BIND_ADDRESS:-0.0.0.0}:${PUBLIC_SSH_PORT:-22}:2222"
+      - "${PUBLIC_BIND_ADDRESS:-0.0.0.0}:${PUBLIC_SSH_ALT_PORT:-2222}:2222"
+      - "${PUBLIC_BIND_ADDRESS:-0.0.0.0}:${PUBLIC_TELNET_PORT:-23}:2223"
