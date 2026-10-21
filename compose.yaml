@@ -17,6 +17,8 @@ services:
     build: ./docker/guard
     <<: *restrictions
     cap_add: [NET_ADMIN]
+    tmpfs:
+      - /run:rw,noexec,nosuid,size=1m
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${HTTP_PORT:-8080}:8080"
       - "${BIND_ADDRESS:-127.0.0.1}:${SSH_PORT:-2222}:2222"

@@ -12,6 +12,6 @@ This is a functional initial collector, not a load-tested production deployment.
 
 ## Version 0.2.0
 
-- 22 local tests passed: the original 14 collector tests plus 8 combined-timeline tests covering cross-protocol IP filtering, session source inference, credentials redaction, missing evidence, malformed/partial records, bounded tails, session selection and timezone requirements.
-- Compose YAML parsed locally. No Docker daemon or container capabilities are available in the authoring environment. GitHub CI now runs a full Docker Compose HTTP/SSH/egress smoke check; see the pull request checks for executed runtime evidence.
+- 25 local tests passed: the original 14 collector tests plus 11 combined-timeline tests covering cross-protocol IP filtering, session source inference, credentials redaction, missing evidence, malformed/partial records, bounded tails, session selection and timezone requirements.
+- Compose YAML parsed locally. No Docker daemon or container capabilities are available in the authoring environment. GitHub Actions run 39679790779 passed the Docker Compose runtime smoke step: HTTP capture, Cowrie SSH login, harmless exploration commands, persisted combined timeline and denial of an outbound connection to a local test container. The final PR checks cover subsequent reporting/configuration refinements.
 - SSH shell is Cowrie emulation, not an actual compromised PHP worker or host account. Outbound callbacks are denied, so referenced URLs are logged but remote payloads are not fetched.

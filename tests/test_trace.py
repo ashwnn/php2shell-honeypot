@@ -76,6 +76,27 @@ class TraceTests(unittest.TestCase):
         self.args.session='testsession'
         self.assertEqual(snapshot(self.args)['event_count'],1)
 
+    def test_conflicting_session_sources_not_inferred(self):
+        self.write([self.event('cowrie.session.connect',src_ip='198.51.100.7'),
+                    self.event('cowrie.session.connect',src_ip='198.51.100.8'),
+                    self.event('cowrie.command.input',input='id')])
+        command=next(e for e in snapshot(self.args)['events'] if e['event']=='cowrie.command.input')
+        self.assertIsNone(command['src_ip'])
+        self.assertTrue(command['source_conflict'])
+
+    def test_invalid_session_schema_skipped(self):
+        self.write([self.event('cowrie.command.input',session=[],input='id')])
+        report=snapshot(self.args)
+        self.assertEqual(report['protocols'],{'http':1})
+        self.assertEqual(report['coverage'],'partial')
+
+    def test_event_retention_reports_coverage(self):
+        self.write([self.event('cowrie.command.input',input='id') for _ in range(5)])
+        self.args.limit=2
+        report=snapshot(self.args)
+        self.assertLessEqual(report['event_count'],2)
+        self.assertTrue(any('limit' in w for w in report['warnings']))
+
     def test_requires_aware_time(self):
         with self.assertRaises(ValueError):timestamp('2026-10-21T19:00:00')
         self.assertEqual(timestamp('2026-10-21T12:00:00-07:00'),'2026-10-21T19:00:00+00:00')

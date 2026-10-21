@@ -47,6 +47,8 @@ def http_events(path, limit, warnings):
         for event_id,stamp,peer,metadata,filename,digest,size in rows[:limit]:
             try:
                 metadata=json.loads(metadata)
+                if not isinstance(metadata,dict):
+                    raise ValueError('metadata is not an object')
                 source=json.loads(peer)
                 ip=source[0] if isinstance(source,list) and source else None
                 # Raw evidence remains intact; omit arbitrary headers from summary.
@@ -75,6 +77,10 @@ def cowrie_events(path, max_bytes, max_files, limit, warnings):
     if len(files)>max_files:
         warnings.append('Cowrie file limit reached; older rotations excluded')
     events=[]
+    sources={}
+    retained_bytes=0
+    retention_cut=False
+    source_cut=False
     for file in files[:max_files]:
         try:
             if not file.is_file() or file.is_symlink():
@@ -103,6 +109,8 @@ def cowrie_events(path, max_bytes, max_files, limit, warnings):
                         obj=json.loads(line)
                         if not isinstance(obj,dict):
                             raise ValueError('not an event')
+                        if any(obj.get(k) is not None and not isinstance(obj[k],str) for k in ('session','src_ip','eventid')):
+                            raise ValueError('invalid Cowrie schema')
                         stamp=timestamp(obj['timestamp'])
                         event=str(obj['eventid'])
                     except (ValueError,KeyError,TypeError):
@@ -114,16 +122,26 @@ def cowrie_events(path, max_bytes, max_files, limit, warnings):
                           'session':obj.get('session'), 'event':event,
                           'evidence_file':file.name, 'evidence_offset':offset,
                           'details':obj}
-                    # Keep only the newest bounded set while still reading session anchors.
-                    events.append(item)
+                    session=item['session']
+                    if session and item['src_ip']:
+                        if session in sources or len(sources)<100000:
+                            sources.setdefault(session,set()).add(item['src_ip'])
+                        else:
+                            source_cut=True
+                    heapq.heappush(events,(stamp,item['id'],len(line),item))
+                    retained_bytes+=len(line)
+                    while len(events)>limit or retained_bytes>16*1024*1024:
+                        retained_bytes-=heapq.heappop(events)[2]
+                        retention_cut=True
         except OSError as exc:
             warnings.append('Cowrie file unavailable: '+file.name+':'+str(exc))
     # Some Cowrie command records omit src_ip. Resolve only inside an observed
     # session with one consistent source; never borrow an IP across sessions.
-    sources={}
-    for e in events:
-        if e['session'] and e['src_ip']:
-            sources.setdefault(e['session'],set()).add(e['src_ip'])
+    events=[entry[3] for entry in events]
+    if retention_cut:
+        warnings.append('Cowrie event/retained-byte limit reached; older events excluded')
+    if source_cut:
+        warnings.append('Cowrie session-source index limit reached')
     for e in events:
         found=sources.get(e['session'],set())
         if len(found)>1:

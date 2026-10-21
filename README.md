@@ -115,7 +115,7 @@ docker compose cp ssh:/cowrie/cowrie-git/var/log/cowrie evidence/ssh-logs
 docker compose cp ssh:/cowrie/cowrie-git/var/lib/cowrie/tty evidence/tty
 docker compose cp ssh:/cowrie/cowrie-git/var/lib/cowrie/downloads evidence/artifacts
 # Replay a captured terminal recording using Cowrie's packaged tool:
-docker compose exec ssh /cowrie/cowrie-env/bin/python3 /cowrie/cowrie-git/bin/playlog /cowrie/cowrie-git/var/lib/cowrie/tty/RECORDING
+docker compose exec ssh /cowrie/cowrie-env/bin/python3 -m cowrie.scripts.playlog /cowrie/cowrie-git/var/lib/cowrie/tty/RECORDING
 ```
 
 `docker compose down` keeps volumes. `docker compose down -v` deletes the evidence. Compose stdout logs rotate separately from persistent evidence. The HTTP sensor has a conservative storage budget; Cowrie log/TTY/artifact storage needs a dedicated volume quota and an operator retention policy. Neither the guard nor reporter adds a hard Cowrie disk quota. Read-only SQLite reports need the live database/WAL files together.
