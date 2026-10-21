@@ -1,6 +1,6 @@
 # PHP2Shell Honeypot
 
-Version 0.1.0. A dependency-free Python 3.12+ HTTP/1.x decoy for collecting PHP2Shell-related probes and general PHP attack traffic. No PHP interpreter or uploaded code is executed. All paths return a generic upload page with Apache/PHP-looking headers.
+Version 0.2.0. A dependency-free Python 3.12+ HTTP/1.x decoy for collecting PHP2Shell-related probes and general PHP attack traffic. No PHP interpreter or uploaded code is executed. All paths return a generic upload page with Apache/PHP-looking headers.
 
 ## Start
 
@@ -57,19 +57,81 @@ sudo sh scripts/capture.sh eth0 /secure/pcap
 
 The script records TCP ports 8080/8443 with full snap length and a 32 x 100 MB rotating ring. Adapt the filter to the actual public ports and interface, including 80/443 if forwarded there. PCAP records retransmissions, rejected connections, and TLS handshake traffic; HTTPS application content is encrypted there. Monitor tcpdump's dropped-packet counters. Rotation overwrites old packets. Check the capture service account can write the destination before use. Packet capture requires host privileges; the application does not.
 
-## Container
+## Docker Compose: HTTP + SSH
+
+Run on a dedicated Linux Docker Engine VM with Compose v2. No host-directory ownership setup is required; evidence lives in persistent named volumes.
 
 ```sh
-mkdir -p data
-sudo chown 65532:65532 data
-chmod 700 data
-docker compose up --build -d
-docker compose logs -f
+git clone https://github.com/ashwnn/php2shell-pot.git
+cd php2shell-pot
+docker compose up -d --build
 ```
 
-Compose binds localhost by default. Change the published address deliberately for an isolated sensor VM. Use a dedicated disposable VM outside production networks, deny outbound initiation and private-network access at the host/network boundary, and allow only inbound sensor ports plus established reply traffic. Container capability restrictions do not themselves enforce network egress isolation. Do not mount credentials, Docker sockets, or production files. The supplied image tag is mutable; pin the built image/base digest before repeatable deployment. Docker packaging was prepared but not executed in the build environment.
+This starts a PHP-looking HTTP decoy on `127.0.0.1:8080` and a Cowrie SSH decoy on `127.0.0.1:2222`. Cowrie accepts any attempted password and provides an emulated shell/filesystem; the visitor never receives a host shell. Try locally:
 
-A reverse proxy/CDN can normalize malformed requests, block uploads, change chunking, and hide the real TCP source. Prefer direct termination for evidence fidelity. Forwarded headers are recorded as untrusted bytes and never replace the actual peer. No public deployment, firewall changes, or cloud resources have been created.
+```sh
+curl -F 'file=@README.md' http://127.0.0.1:8080/upload.php
+ssh -p 2222 root@127.0.0.1
+# Enter any made-up password, then: id, pwd, ls /, exit
+```
+
+For public exposure on the isolated VM, use:
+
+```sh
+BIND_ADDRESS=0.0.0.0 docker compose up -d --build
+```
+
+For persistent configuration, copy `.env.example` to `.env` and edit its address/ports. Keep the host's real SSH management port separate and limited to your management address or private network. `SSH_PORT` is the attacker-facing honeypot, not administrator SSH. Do not map it to the port currently used to administer your VM. No public deployment was performed by this change.
+
+The guard service installs an outbound firewall inside a shared container network namespace. The decoys have no NET_ADMIN capability; only the guard has it. New outbound connections are dropped, including DNS, downloads, reverse connections and loopback requests; established replies to inbound sessions remain allowed. IPv6 is disabled in that namespace. Cowrie SSH forwarding is disabled. Failures installing the guard rules prevent the decoys from starting. This does not protect the host from a container/kernel escape; use a disposable VM and a dedicated evidence disk. Linux Docker Engine is the supported target; rootless Docker, Desktop networking, and restrictive managed runtimes may need adaptation. If the guard is recreated, recreate the decoys together with `docker compose up -d --force-recreate`.
+
+The SSH service records login attempts, accepted credentials, source addresses, session IDs, commands, terminal recordings and supported file-transfer artifacts. Referenced download URLs remain in command logs, but outbound payload fetching is blocked. Upload artifacts are retained without being executed by a host shell. Cowrie shell emulation has finite command support. HTTP and SSH are separate decoys on the same address; the PHP endpoint does not execute an exploit or automatically hand a web shell into SSH.
+
+### Inspect and trace activity
+
+```sh
+docker compose ps
+docker compose logs -f sensor ssh
+docker compose run --rm -T tools --indicators
+docker compose run --rm -T tools --ip 198.51.100.7 --indicators
+docker compose run --rm -T tools --session SESSION_ID
+docker compose run --rm -T tools --since 2026-10-21T00:00:00Z
+docker compose run --rm -T tools --follow
+```
+
+`tools` reads both volumes without network access or write access to evidence. It produces one UTC timeline, links SSH events within an observed session, and filters source IPs across HTTP and SSH. It extracts observed HTTP/FTP URL strings and IPv4 literals from request targets and SSH commands as passive indicators. It never visits them. This is not exhaustive payload IOC extraction, network-path tracing, geolocation, or identifying a real person behind a VPN/NAT. Matching source IP/time is a correlation lead, not proof of the same actor or successful PHP exploitation.
+
+Credentials are redacted in reports by default; use `--show-credentials` only when needed. Original Cowrie evidence intentionally keeps the attempted credentials. HTTP raw captures retain headers/body even though the combined summary omits arbitrary headers. Coverage warnings report absent sources, truncated log tails, malformed lines and event limits. No events can mean no activity; missing files mean unknown coverage. Follow mode scans bounded recent snapshots and can miss events between scans or repeat events after rotation; raw logs remain authoritative.
+
+### Export and replay
+
+```sh
+mkdir -p evidence
+chmod 700 evidence
+docker compose run --rm -T tools --indicators > evidence/timeline.json
+# Run after stopping sessions when a consistent evidence snapshot is required:
+docker compose cp sensor:/data evidence/http
+docker compose cp ssh:/cowrie/cowrie-git/var/log/cowrie evidence/ssh-logs
+docker compose cp ssh:/cowrie/cowrie-git/var/lib/cowrie/tty evidence/tty
+docker compose cp ssh:/cowrie/cowrie-git/var/lib/cowrie/downloads evidence/artifacts
+# Replay a captured terminal recording using Cowrie's packaged tool:
+docker compose exec ssh /cowrie/cowrie-env/bin/python3 /cowrie/cowrie-git/bin/playlog /cowrie/cowrie-git/var/lib/cowrie/tty/RECORDING
+```
+
+`docker compose down` keeps volumes. `docker compose down -v` deletes the evidence. Compose stdout logs rotate separately from persistent evidence. The HTTP sensor has a conservative storage budget; Cowrie log/TTY/artifact storage needs a dedicated volume quota and an operator retention policy. Neither the guard nor reporter adds a hard Cowrie disk quota. Read-only SQLite reports need the live database/WAL files together.
+
+### Test the stack
+
+```sh
+docker compose --profile test up -d --build
+# Host test dependency on Debian/Ubuntu: sudo apt-get install sshpass
+python3 scripts/smoke-compose.py
+docker compose --profile test stop probe
+```
+
+The smoke check makes a synthetic HTTP request, logs into Cowrie, runs harmless exploration commands, confirms their persisted timeline, and checks outbound denial against a local test container. No internet target is used. The `probe` service is test-only and publishes no ports.
+
+Source references: [Cowrie Docker configuration](https://docs.cowrie.org/en/latest/docker/README.html), [Cowrie configuration defaults](https://github.com/cowrie/cowrie/blob/main/src/cowrie/data/etc/cowrie.cfg.dist), [official Cowrie image](https://hub.docker.com/r/cowrie/cowrie). Cowrie is pinned to the inspected 3.1.3 image digest; review/re-pin for updates. The Python/Alpine base tags remain mutable.
 
 ## Detection basis and limits
 

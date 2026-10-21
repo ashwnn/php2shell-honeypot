@@ -9,3 +9,9 @@ Executed 2026-10-21, Python 3.12.14, localhost only.
 - No vulnerable PHP runtime, exploit replay, cloud deployment, or external active scan was used.
 
 This is a functional initial collector, not a load-tested production deployment. Load testing, service supervision, alerts, dedicated disk quota, ingress/egress firewalling, certificate provisioning, retention operations and capture-drop monitoring remain deployment work. No claim of lossless capture, exploit confirmation, or post-exploitation visibility is made.
+
+## Version 0.2.0
+
+- 22 local tests passed: the original 14 collector tests plus 8 combined-timeline tests covering cross-protocol IP filtering, session source inference, credentials redaction, missing evidence, malformed/partial records, bounded tails, session selection and timezone requirements.
+- Compose YAML parsed locally. No Docker daemon or container capabilities are available in the authoring environment. GitHub CI now runs a full Docker Compose HTTP/SSH/egress smoke check; see the pull request checks for executed runtime evidence.
+- SSH shell is Cowrie emulation, not an actual compromised PHP worker or host account. Outbound callbacks are denied, so referenced URLs are logged but remote payloads are not fetched.

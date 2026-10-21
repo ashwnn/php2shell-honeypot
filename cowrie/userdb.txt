@@ -1,0 +1,6 @@
+# Decoy accounts only; these never create host or container OS accounts.
+# Allow any attempted password so visitors reach the simulated shell.
+root:x:*
+admin:x:*
+www-data:x:*
+*:x:*
